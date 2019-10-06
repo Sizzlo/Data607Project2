@@ -1,0 +1,516 @@
+---
+title: "Data607 Project2"
+author: "Tony Mei"
+date: "10/3/2019"
+output: html_document
+---
+
+## Data Project 2
+
+Choose any three of the “wide” datasets identified in the Week 6 Discussion items.
+
+# Table of Contents of the 3 Datasets
+1. Football analytics from Yahoo, ESPN, CBS
+2. Monitoring salaries of female and male faculty in a college.
+3. Hospital Readmissions Reduction Program
+
+Setup:
+```{r}
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+```
+
+### DATASET 1- Fantasy Football Analytics
+
+We are scraping datasets of each football players and input together. Then we will predict which player will score the most of that week based on his position. We are optimizing the most points of a football player of that week.
+
+In our fantasy football team, we have 1 QB, 3 WR, 2 RB, 1 TE, 1 K and DST. We are trying to find the highest scoring player for each position to optimize our chance of winning. The point scoring system is showed below acquired from the website https://football.fantasysports.yahoo.com/f1/43466/settings.
+
+Passing Yards
+25 yards per point
+
+Passing Touchdowns
+4
+
+Interceptions
+-1
+
+Rushing Yards
+10 yards per point
+
+Rushing Touchdowns
+6
+
+Receiving Yards
+10 yards per point
+
+Receiving Touchdowns
+6
+
+Return Yards
+25 yards per point
+0
+Return Touchdowns
+6
+
+2-Point Conversions
+2
+
+Fumbles Lost
+-2
+
+Offensive Fumble Return TD
+6
+
+Kickers
+League Value
+Yahoo Default Value
+Field Goals 0-19 Yards
+3
+
+Field Goals 20-29 Yards
+3
+
+Field Goals 30-39 Yards
+3
+
+Field Goals 40-49 Yards
+4
+
+Field Goals 50+ Yards
+5
+
+Point After Attempt Made
+1
+
+Defense/Special Teams
+League Value
+Yahoo Default Value
+Sack
+1
+
+Interception
+2
+
+Fumble Recovery
+2
+
+Touchdown
+6
+
+Safety
+2
+
+Block Kick
+2
+
+Kickoff and Punt Return Touchdowns
+6
+
+Points Allowed 0 points
+10
+
+Points Allowed 1-6 points
+7
+
+Points Allowed 7-13 points
+4
+
+Points Allowed 14-20 points
+1
+
+Points Allowed 21-27 points
+0
+
+Points Allowed 28-34 points
+-1
+
+Points Allowed 35+ points
+-4
+
+Extra Point Returned
+2
+
+1)First, we load the library for the fantasy football analytics
+```{r}
+library("ffanalytics")
+```
+2)Then, scrape the  data from the sources CBS, Yahoo for the position of quarterback=QB, runningback=RB, wide receivers=WR, tightend="TE", Defense="DST", Kicker="K" for season 2019 and week 4.
+```{r}
+my_scrape <- scrape_data(src = c("CBS", "Yahoo"), pos = c("QB", "RB", "WR", "TE", "DST", "K"), season = 2019, week = 4)
+```
+3)Calculate the project points of each player. 
+Add rankings information, risk value, and ADP/AAV data. 
+Add the player names, teams, positions, age, and experience to the data set.(However some position will not have valid data, eg. a defense having age,risk, or experience)
+Then create the csv file of the data
+```{r}
+#projected points are calculated
+my_projections <- projections_table(my_scrape)
+#To add rankings information, risk value, and ADP/AAV data
+my_projections <- my_projections %>% add_ecr() %>% add_risk() %>%  add_adp() %>% add_aav()
+# adds the player names, teams, positions, age, and experience to the data set
+my_projections <- my_projections %>% add_player_info()
+#creates the csv file of the data
+write.csv(my_projections, file=file.path(getwd(), "projections.csv"), row.names=FALSE)
+```
+
+4)Read the csv file.
+```{r}
+fb<-read.csv("projections.csv", sep=",")
+```
+
+5)Filter out robust and weighted values of each player and we keep the average. 
+Next, select from the data, firstname, lastname, position and points.
+```{r}
+tidydata_fb<-fb %>% 
+  filter(avg_type=="average") %>% 
+  select(first_name, last_name, position, points)
+```
+6)We extract rows based on each position, QB, WR, RB, TE, K.
+Put the points in ascending order so we can select the highest score of each position.
+
+```{r}
+QB<-tidydata_fb %>% 
+  filter(position=="QB") %>% 
+  arrange(desc(points))
+WR<-tidydata_fb %>% 
+  filter(position=="WR") %>% 
+  arrange(desc(points))
+RB<-tidydata_fb %>% 
+  filter(position=="RB") %>% 
+  arrange(desc(points))
+TE<-tidydata_fb %>% 
+  filter(position=="TE") %>% 
+  arrange(desc(points))
+K<-tidydata_fb %>% 
+  filter(position=="K") %>% 
+  arrange(desc(points))
+DST<-tidydata_fb %>% 
+  filter(position=="DST") %>% 
+  arrange(desc(points))
+```
+7)Now for each position, we select the top scorers. We need 1 QB, 3 WR, 2 RB, 1 TE, 1 K and 1 DST. 
+```{r}
+QB1<-slice(QB, 0:1)
+WR3<-slice(WR, 0:3)
+RB2<-slice(RB, 0:2)
+TE1<-slice(TE, 0:1)
+K1<-slice(K, 0:1)
+DST1<-slice(DST, 0:1)
+```
+
+8)This will be my optimal scoring team lineup for week 4 of season 2019 for my football team.
+
+QB- Patrick   Mahomes       QB  23.94
+
+WR- DeAndre   Hopkins       WR 12.940
+
+WR- Keenan     Allen       WR 12.875
+
+WR- Julio     Jones       WR 12.445
+
+RB- Christian McCaffrey       RB 17.265
+
+RB- Ezekiel   Elliott       RB 15.330
+
+TE- Travis     Kelce       TE 11.665
+
+K- Greg  Zuerlein        K   9.95
+
+DST- Minnesota   Vikings      DST  8.348
+
+## Graph Analysis
+For each position, I will create a Top 10 chart to visualize how each player performs.
+
+```{r}
+Top10_QB<-slice(QB, 0:10)
+ggplot(data = Top10_QB, aes(x=last_name,y=points))+
+  geom_bar(stat = 'identity',aes(fill=last_name))+
+  geom_text(aes(x = last_name, y = points, 
+                label = paste(points),
+                group = last_name,
+                vjust = -0.4)) +
+  labs(title = "Top 10 Quarterbacks", 
+       x = "Last Name", 
+       y = "Points")
+```
+
+```{r}
+Top10_WR<-slice(WR, 0:10)
+ggplot(data = Top10_WR, aes(x=last_name,y=points))+
+  geom_bar(stat = 'identity',aes(fill=last_name))+
+  geom_text(aes(x = last_name, y = points, 
+                label = paste(points),
+                group = last_name,
+                vjust = -0.4)) +
+  labs(title = "Top 10 Wide Receivers", 
+       x = "Last Name", 
+       y = "Points")
+```
+
+```{r}
+Top10_RB<-slice(RB, 0:10)
+ggplot(data = Top10_RB, aes(x=last_name,y=points))+
+  geom_bar(stat = 'identity',aes(fill=last_name))+
+  geom_text(aes(x = last_name, y = points, 
+                label = paste(points),
+                group = last_name,
+                vjust = -0.4)) +
+  labs(title = "Top 10 Runningbacks", 
+       x = "Last Name", 
+       y = "Points")
+```
+
+```{r}
+Top10_TE<-slice(TE, 0:10)
+ggplot(data = Top10_TE, aes(x=last_name,y=points))+
+  geom_bar(stat = 'identity',aes(fill=last_name))+
+  geom_text(aes(x = last_name, y = points, 
+                label = paste(points),
+                group = last_name,
+                vjust = -0.4)) +
+  labs(title = "Top 10 Tight Ends", 
+       x = "Last Name", 
+       y = "Points")
+```
+
+```{r}
+Top10_K<-slice(K, 0:10)
+ggplot(data = Top10_K, aes(x=last_name,y=points))+
+  #geom_point(alpha = 0.5, size = 5, color ='blue')
+  geom_bar(stat = 'identity',aes(fill=last_name))+
+  geom_text(aes(x = last_name, y = points, 
+                label = paste(points),
+                group = last_name,
+                vjust = -0.4)) +
+  labs(title = "Top 10 Kickers", 
+       x = "Last Name", 
+       y = "Points")
+```
+
+```{r}
+Top10_DST<-slice(DST, 0:10)
+ggplot(data = Top10_DST, aes(x=last_name,y=points))+
+  geom_bar(stat = 'identity',aes(fill=last_name))+
+  geom_text(aes(x = last_name, y = points, 
+                label = paste(points),
+                group = last_name,
+                vjust = -0.4)) +
+  labs(title = "Top 10 Defense", 
+       x = "Last Name", 
+       y = "Points")
+```
+
+## Dataset2:
+Do male faculty make more their female counterparts in the college administration?
+  
+Variables:
+Sex
+Salary
+years of service
+years since PhD
+Associate Professor or Professor
+What discpline do they work in? A or B
+
+1. Read the csv file.
+```{r}
+Prof<-read.csv(file="https://raw.githubusercontent.com/vincentarelbundock/Rdatasets/master/csv/carData/Salaries.csv", header=TRUE, sep=",")
+```
+
+2)Rename the first column. Make the other columns look better with some capitalizations of the words.
+
+```{r}
+Prof<-Prof %>% 
+  rename(Rank=rank, Discipline=discipline, Years_since_PhD=yrs.since.phd, Years_Service=yrs.service, Sex=sex, Salary=salary)
+```
+
+3)Group the average of female associate professors, assistant and professors.
+Also we dissect the groups down into disciplines A or B.
+Then we find the average of salary, years of service, years of PhD of each group.
+
+```{r}
+#F_Assist_A- Female assistant professor with discipline A
+#F_Assist_B- Female assistant professor with discipline B
+#F_AP_A- Female associate professor with discipline A
+#F_AP_B- Female associate professor with discipline B
+#F_P_A- Female professor with discipline A
+#F_P_B- Female professor with discipline B
+
+F_Assist_A<-Prof %>% 
+  filter(Rank=="AsstProf", Sex=="Female", Discipline=="A") %>% 
+  summarise(Avg_Salary=mean(Salary),
+            Avg_Years_Service=mean(Years_Service),
+            Avg_Since_PhD=mean(Years_since_PhD))
+
+F_Assist_B<-Prof %>% 
+  filter(Rank=="AsstProf", Sex=="Female", Discipline=="A") %>% 
+  summarise(Avg_Salary=mean(Salary),
+            Avg_Years_Service=mean(Years_Service),
+            Avg_Since_PhD=mean(Years_since_PhD))
+
+F_AP_A<-Prof %>% 
+  filter(Rank=="AssocProf", Sex=="Female", Discipline=="A") %>% 
+  summarise(Avg_Salary=mean(Salary),
+            Avg_Years_Service=mean(Years_Service),
+            Avg_Since_PhD=mean(Years_since_PhD))
+F_AP_B<-Prof %>% 
+  filter(Rank=="AssocProf", Sex=="Female", Discipline=="B") %>% 
+  summarise(Avg_Salary=mean(Salary),
+            Avg_Years_Service=mean(Years_Service),
+            Avg_Since_PhD=mean(Years_since_PhD))
+F_P_A<-Prof %>% 
+  filter(Rank=="Prof", Sex=="Female", Discipline=="A") %>% 
+  summarise(Avg_Salary=mean(Salary),
+            Avg_Years_Service=mean(Years_Service),
+            Avg_Since_PhD=mean(Years_since_PhD))
+F_P_B<-Prof %>% 
+  filter(Rank=="Prof", Sex=="Female", Discipline=="B") %>% 
+  summarise(Avg_Salary=mean(Salary),
+            Avg_Years_Service=mean(Years_Service),
+            Avg_Since_PhD=mean(Years_since_PhD))
+```
+
+4)Group the average of male associate professors, assistant and professors.
+Also we dissect the groups down into disciplines A or B.
+
+```{r}
+#M_Assist_A- Male assistant professor with discipline A
+#M_Assist_B- Male assistant professor with discipline B
+#M_AP_A- Male associate professor with discipline A
+#M_AP_B- Male associate professor with discipline B
+#M_P_A- Male professor with discipline A
+#M_P_B- Male professor with discipline B
+
+M_Assist_A<-Prof %>% 
+  filter(Rank=="AsstProf", Sex=="Male", Discipline=="A") %>% 
+  summarise(Avg_Salary=mean(Salary),
+            Avg_Years_Service=mean(Years_Service),
+            Avg_Since_PhD=mean(Years_since_PhD))
+M_Assist_B<-Prof %>% 
+  filter(Rank=="AsstProf", Sex=="Male", Discipline=="B") %>% 
+  summarise(Avg_Salary=mean(Salary),
+            Avg_Years_Service=mean(Years_Service),
+            Avg_Since_PhD=mean(Years_since_PhD))
+
+M_AP_A<-Prof %>% 
+  filter(Rank=="AssocProf", Sex=="Male", Discipline=="A") %>% 
+  summarise(Avg_Salary=mean(Salary),
+            Avg_Years_Service=mean(Years_Service),
+            Avg_Since_PhD=mean(Years_since_PhD))
+M_AP_B<-Prof %>% 
+  filter(Rank=="AssocProf", Sex=="Male", Discipline=="B") %>% 
+  summarise(Avg_Salary=mean(Salary),
+            Avg_Years_Service=mean(Years_Service),
+            Avg_Since_PhD=mean(Years_since_PhD))
+M_P_A<-Prof %>% 
+  filter(Rank=="Prof", Sex=="Male", Discipline=="A") %>% 
+  summarise(Avg_Salary=mean(Salary),
+            Avg_Years_Service=mean(Years_Service),
+            Avg_Since_PhD=mean(Years_since_PhD))
+M_P_B<-Prof %>% 
+  filter(Rank=="Prof", Sex=="Male", Discipline=="B") %>% 
+  summarise(Avg_Salary=mean(Salary),
+            Avg_Years_Service=mean(Years_Service),
+            Avg_Since_PhD=mean(Years_since_PhD))
+```
+
+## Analysis
+I noticed that years of service does not play that big of a role in predicting salaries because there are outliers.
+For example, there was a participant with 1 year of experience making 100K$ vs one with 49 years of service making 80K.
+The discpline the faculty work in affects the salaries greatly more.
+
+Based of this data, on average the male faculty does make slightly more than the female faculty. However this does not include
+variables like overtime, certifications and etc.
+
+Here, I created a dataframe that shows the correlation between female and male faculties in the same job titles and discipline. The closer the correlation of one another to 1 means the salaries of the two are more closer.
+
+```{r}
+F_P_A$Avg_Salary/M_P_A$Avg_Salary 
+
+F_P_B$Avg_Salary/M_P_B$Avg_Salary
+
+F_AP_A$Avg_Salary/M_AP_A$Avg_Salary
+
+F_AP_B$Avg_Salary/M_AP_B$Avg_Salary 
+
+F_Assist_A$Avg_Salary/M_Assist_A$Avg_Salary 
+
+F_Assist_B$Avg_Salary/M_Assist_B$Avg_Salary
+
+F_vs_M<-c('Female Prof w. discipline A/Male Prof w. discipline A', 'Female Prof w. discipline B/Male Prof w discipline B', 'Female Associate Prof w. discipline A/Male Associate Prof w. discipline A', 'Female Associate Prof w. discipline B/Male Associate Prof w. discipline B', 'Female Assist Prof w. discipline A/Male Assist Prof w. discipline A', 'Female Assist Prof w. discipline B/Male Assist Prof w. discipline B')
+integer<-c(F_P_A$Avg_Salary/M_P_A$Avg_Salary, F_P_B$Avg_Salary/M_P_B$Avg_Salary, F_AP_A$Avg_Salary/M_AP_A$Avg_Salary, F_AP_B$Avg_Salary/M_AP_B$Avg_Salary, F_Assist_A$Avg_Salary/M_Assist_A$Avg_Salary, F_Assist_B$Avg_Salary/M_Assist_B$Avg_Salary)
+
+cor<-data.frame(F_vs_M, integer)
+cor
+```
+```{r}
+ggplot(data = cor, aes(x=F_vs_M,y=integer))+
+geom_point(alpha = 0.5, size = 5, color ='blue')+
+labs(title = "Correlation between Male and Female College Faculty",
+       x = "Average Salary of Female/Male", 
+       y = "Correlation") + coord_flip() 
+```
+
+## Dataset 3: Hospital Readmissions Reduction Program
+
+# Question: Out of the 5 procedures which one will have the lowest readmissions throughout all the hospitals?
+
+In October 2012, CMS began reducing Medicare payments for Inpatient Prospective Payment System hospitals with excess readmissions. Excess readmissions are measured by a ratio, calculated by dividing a hospital’s number of “predicted” 30-day readmissions for heart attack (AMI), heart failure (HF), pneumonia, chronic obstructive pulmonary disease (COPD), hip/knee replacement (THA/TKA), and coronary artery bypass graft surgery (CABG) by the number that would be “expected,” based on an average hospital with similar patients.
+
+1) Read the .csv file from github.
+```{r}
+Med <- read.csv('https://raw.githubusercontent.com/Sizzlo/Datasets/master/Hospital.csv',  na.strings = c("Not Available", "NA", "Too Few to Report"), header = TRUE, stringsAsFactors = FALSE)
+dim(Med)
+```
+
+2) Create a new column for ratio of number of readmission to total of discharges
+
+A lower ratio means the hospital have a lower readmission to the total of discharge which is favorable.
+```{r}
+Med1 <- Med %>% 
+  select(Hospital.Name, Measure.Name, Number.of.Discharges, Number.of.Readmissions, State) %>% 
+  mutate(Ratio.Readmit.Discharge = (Number.of.Readmissions / Number.of.Discharges))
+Med1 %>% 
+  select(Hospital.Name, Measure.Name, Ratio.Readmit.Discharge) %>% 
+  arrange(Ratio.Readmit.Discharge)
+ 
+```
+
+We noticed there is a lower ratio of readmits to total discharges for certain procedures like hip/Knee replacement. So for someone that needs recommendations for top 3 hospitals to go to for knee replacement and want to have lower chance of being readmitted, it would be LABETTE HEALTH	(READM_30_HIP_KNEE_HRRP	0.01800327)		
+DUNES SURGICAL HOSPITAL	(READM_30_HIP_KNEE_HRRP	0.01983664)		
+SAUK PRAIRIE HOSPITAL (READM_30_HIP_KNEE_HRRP 0.01996928).	
+
+# Ratio.Readmit.Discharge by procedure
+
+3) Now let's observe the ratio of readmit to total discharge by each procedure. We noticed that on average hip/knee replacement have the lowest ratio.
+```{r}
+ggplot(Med1, aes(x = Measure.Name, y = Ratio.Readmit.Discharge)) +
+  geom_boxplot() + coord_flip()
+```
+
+# Graph analysis of total readmissions by each procedure.
+
+We noticed that hip/knee rep has the lowest readmissions numbers compared to other procedures, so this can play a role in the lower ratio as stated above.
+
+```{r}
+ggplot(Med1, aes(x = Measure.Name, y = Number.of.Readmissions)) +
+  geom_boxplot() + coord_flip()
+```
+
+# Conclusion 
+
+Using the data from above, I can declared that hip/knee surgery is the procedure that have the lowest readmissions and the lower ratio to readmission to discharge. Having a slight medical background, I believe this is true because hip/knee surgery is the procedure that will have the least complications compared to the others. The other procedures deals with major organs:
+
+Heart attack (AMI), heart failure (HF) deals with Heart,
+
+Pneumonia, chronic obstructive pulmonary disease (COPD) with Lungs, 
+Hip/knee replacement (THA/TKA) with hip/knee,
+
+Coronary artery bypass graft surgery (CABG) with Heart. 
+
+
+
+
+
+  
